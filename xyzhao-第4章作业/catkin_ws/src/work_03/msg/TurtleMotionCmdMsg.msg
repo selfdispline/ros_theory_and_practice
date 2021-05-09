@@ -1,0 +1,4 @@
+string name
+bool start_move
+float32 linear_velocity_x
+float32 angular_velocity_z
