@@ -1,0 +1,231 @@
+<?xml version="1.0"?>
+<robot name="mbot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <!-- Defining the colors used in this robot -->
+    <!-- <xacro:include filename="$(find onebot_description)/urdf/materials.xacro" /> -->
+
+    <!-- PROPERTY LIST -->
+    <xacro:property name="M_PI" value="3.1415926"/>
+    <xacro:property name="wheel_joint_x" value="-0.04"/>
+    <xacro:property name="wheel_joint_y" value="0.14"/>
+    <xacro:property name="wheel_joint_z" value="-0.045"/>
+    <xacro:property name="wheel_radius" value="0.04688"/>
+    <xacro:property name="caster_wheel_length" value="0.02333" />
+    <xacro:property name="caster_wheel_radius" value="0.024165" />
+    <xacro:property name="caster_base_length" value="0.015" />
+    <xacro:property name="caster_base_radius" value="0.015" />
+    <xacro:property name="footprint_joint_z" value="0.09188"/>
+    
+
+    <xacro:macro name="wheel" params="prefix reflect">
+        <link name="${prefix}_wheel_link">
+            <inertial>
+                <mass value="0.144" />
+                <origin xyz="0 0 0" />
+                <inertia  ixx="0.00008929863" ixy="0" ixz="0" iyy="0.000168983" iyz="0" izz="0.00008929863" />
+            </inertial>
+            <visual>
+                <origin xyz=" 0 0 0" rpy="0 0 1.57" />
+                <geometry>
+                    <mesh filename="package://mbot_description/meshes/wheel.dae" />
+                </geometry>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0" />
+                <geometry>
+                        <cylinder length="0.02" radius="0.04688" />
+                </geometry>
+            </collision>
+        </link>
+
+        <gazebo reference="${prefix}_wheel_link">
+            <material>Gazebo/Green</material>
+        </gazebo>
+
+        <joint name="${prefix}_wheel_joint" type="continuous">
+            <origin xyz="${wheel_joint_z} ${reflect*wheel_joint_y} ${wheel_joint_z}" rpy="0 0 0"/>
+            <parent link="base_link"/>
+            <child link="${prefix}_wheel_link"/>
+            <axis xyz="0 1 0"/>
+        </joint>
+
+        <!-- Transmission is important to link the joints and the controller -->
+        <transmission name="${prefix}_wheel_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}_wheel_joint" >
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="${prefix}_wheel_joint_motor">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
+
+    <!-- Macro for robot caster -->
+    <xacro:macro name="caster">
+        <!-- Caster Wheel Link -->
+        <link name="caswheel">
+			<inertial>
+				<mass value="0.03837" />
+				<origin xyz="0 0 0" />
+				<inertia  ixx="0.000008221" ixy="0" ixz="0" iyy="0.000013003" iyz="0" izz="0.000008221" />
+            </inertial>
+            <visual>
+                <origin xyz=" 0 0 0" rpy="${M_PI/2} 0 0" />
+                <geometry>
+                    <mesh filename="package://mbot_description/meshes/caswheel.dae" />
+                </geometry>
+            </visual>
+            <collision>
+				<origin xyz="0 0 0" rpy="${M_PI/2} 0 0" />
+				<geometry>
+					<cylinder length="${caster_wheel_length/2}" radius="${caster_wheel_radius}" />
+				</geometry>
+			</collision>
+        </link>
+
+        <gazebo reference="caswheel">
+            <material>Gazebo/Gray</material>
+        </gazebo>
+
+        <!-- Caster Base Link -->
+        <link name="caster_base">   
+            <inertial>
+                    <mass value="0.06597" />
+                    <origin xyz="-0.01204 0 -0.01454" />
+                    <inertia  ixx="0.000039912" ixy="0" ixz="0.000017794" iyy="0.000050728" iyz="0" izz="0.000035261" />
+            </inertial>
+            <visual>
+                <origin xyz=" 0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://mbot_description/meshes/caster_base2.dae" />
+                </geometry>
+            <collision>
+                <origin xyz="0 0 ${-caster_base_length/2}" rpy="0 0 0" />
+                <geometry>
+                    <cylinder length="${caster_base_length}" radius="${caster_base_radius}" />
+                </geometry>
+            </collision>
+            </visual>
+        </link>
+
+        <gazebo reference="caster_base">
+            <material>Gazebo/Yellow</material>
+        </gazebo>
+
+        <!-- Caster Base Link and Caster Wheel Link Joint -->
+        <joint name="caswheel_caster_joint" type="continuous">
+            <origin xyz="-0.02626 0.0 -0.042385" rpy="0 0 0"/>
+            <parent link="caster_base"/>
+            <child link="caswheel"/>
+            <axis xyz="0 1 0" rpy="0 0 0"/>
+        </joint>
+
+        <!-- Caster base and parent joint -->
+        <joint name="caster_base_joint" type="continuous">
+            <origin xyz="-0.20 0.0 -0.03033" rpy="0 0 0"/>
+            <parent link="base_link"/>
+            <child link="caster_base"/>
+            <axis xyz="0 0 1" rpy="0 0 0"/>
+        </joint>
+
+        <transmission name="baseLink_caster_trans" type="SimpleTransmission">
+            <type>transmission_interface/SimpleTransmission</type>
+            <actuator name="baseLink_caster_motor">
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+            <joint name="$caster_base_joint">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            </joint>
+        </transmission>
+
+        <transmission name="wheel_casterbase_trans" type="SimpleTransmission">
+			<type>transmission_interface/SimpleTransmission</type>
+			<actuator name="wheel_casterbase_motor">
+				<mechanicalReduction>1</mechanicalReduction>
+			</actuator>
+			<joint name="caswheel_caster_joint">
+				<hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+			</joint>
+		</transmission>
+
+    </xacro:macro>
+
+    <xacro:macro name="mbot_base_gazebo">
+        <link name="base_footprint">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="0.001 0.001 0.001" />
+                </geometry>
+            </visual>
+        </link>
+        <gazebo reference="base_footprint">
+            <turnGravityOff>false</turnGravityOff>
+        </gazebo>
+
+        <link name="base_link">
+            <inertial>
+                <origin xyz="-0.108 0 -0.02579" rpy="0 0 0"/>
+                <mass value="3.978"/>
+                <inertia ixx="0.021858680" ixy="0.0" ixz="0.010020353"
+                        iyy="0.078572349" iyz="-0.0"
+                        izz="0.091971324"/>
+            </inertial> 
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://mbot_description/meshes/base_link.dae" />
+                </geometry>
+            </visual>
+            <collision>
+                <origin xyz="-0.125 0 -0.01" rpy="0 0 0" />
+                <geometry>
+                    <box size="0.25 0.25 0.02" />
+                </geometry>
+            </collision>
+        </link>
+
+        <gazebo reference="base_link">
+            <material>Gazebo/blue</material>
+        </gazebo>
+
+        <joint name="base_footprint_joint" type="fixed">
+            <origin xyz="0 0 ${footprint_joint_z}" rpy="0 0 0" />        
+            <parent link="base_footprint"/>
+            <child link="base_link" />
+        </joint>
+
+        <xacro:wheel prefix="left"  reflect="1"/>
+        <xacro:wheel prefix="right" reflect="-1"/>
+        <xacro:caster/>
+
+        <!-- controller -->
+        <gazebo>
+            <plugin name="differential_drive_controller" 
+                    filename="libgazebo_ros_diff_drive.so">
+                <rosDebugLevel>Debug</rosDebugLevel>
+                <publishWheelTF>true</publishWheelTF>
+                <robotNamespace>/</robotNamespace>
+                <publishTf>1</publishTf>
+                <publishWheelJointState>true</publishWheelJointState>
+                <alwaysOn>true</alwaysOn>
+                <updateRate>100.0</updateRate>
+                <legacyMode>true</legacyMode>
+                <leftJoint>left_wheel_joint</leftJoint>
+                <rightJoint>right_wheel_joint</rightJoint>
+                <wheelSeparation>${wheel_joint_y*2}</wheelSeparation>
+                <wheelDiameter>${2*wheel_radius}</wheelDiameter>
+                <broadcastTF>1</broadcastTF>
+                <wheelTorque>30</wheelTorque>
+                <wheelAcceleration>1.8</wheelAcceleration>
+                <commandTopic>cmd_vel</commandTopic>
+                <odometryFrame>odom</odometryFrame> 
+                <odometryTopic>odom</odometryTopic> 
+                <robotBaseFrame>base_footprint</robotBaseFrame>
+            </plugin>
+        </gazebo> 
+    </xacro:macro>
+
+</robot>

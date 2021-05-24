@@ -1,0 +1,32 @@
+<?xml version="1.0"  ?>
+<robot name="kbot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find kbot_description)/urdf/kbot_xacro.xacro" />
+    <xacro:include filename="$(find kbot_description)/urdf/sensors/kinect_gazebo.xacro"/>
+    <xacro:include filename="$(find kbot_description)/urdf/sensors/lidar_gazebo.xacro"/>
+
+    <xacro:property name="lidar_offset_x" value="0"/>
+    <xacro:property name="lidar_offset_y" value="0"/>
+    <xacro:property name="lidar_offset_z" value="0.075"/>
+
+    <xacro:property name="kinect_offset_x" value="0.2"/>
+    <xacro:property name="kinect_offset_y" value="0"/>
+    <xacro:property name="kinect_offset_z" value="0.08"/>
+
+    <joint name="laser_upper_link_joint" type="fixed">
+        <origin xyz="${lidar_offset_x} ${lidar_offset_y} ${lidar_offset_z}" rpy="0 0 0"/>
+        <parent link="upper_base_link"/>
+        <child link="laser_base_link"/>
+    </joint>
+
+    <joint name="kinect_upper_link_joint" type="fixed">
+        <origin xyz="${kinect_offset_x} ${kinect_offset_y} ${kinect_offset_z}" rpy="0 0 0"/>
+        <parent link="upper_base_link"/>
+        <child link="kinect_link"/>
+    </joint>
+
+    <xacro:rplidar prefix="laser"/>
+    <xacro:kinect_camera prefix="kinect"/>
+    <xacro:kbot_base_gazebo/>
+
+
+</robot>

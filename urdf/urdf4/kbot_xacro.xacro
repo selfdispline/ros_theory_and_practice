@@ -1,0 +1,348 @@
+<?xml version="1.0" ?>
+
+<robot name="kbot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<!--  PROPERTY LIST  -->
+    <xacro:property name="M_PI" value="3.1415926"/>
+
+    <xacro:property name="base_mass" value="4"/>
+    <xacro:property name="base_length" value="0.5"/>
+    <xacro:property name="base_width" value="0.5"/>
+    <xacro:property name="base_height" value="0.1"/>
+
+    <xacro:property name="support_mass" value="0.3"/>
+    <xacro:property name="support_length" value="0.05"/>
+    <xacro:property name="support_width" value="0.05"/>
+    <xacro:property name="support_height" value="0.3"/>
+    <xacro:property name="support_offset" value="0.2"/>
+
+    <xacro:property name="wheel_mass" value="2"/>
+    <xacro:property name="wheel_length" value="0.08"/>
+    <xacro:property name="wheel_radius" value="0.12"/>
+    <xacro:property name="rear_wheel_offset" value="0.30"/>
+    <xacro:property name="rear_wheel_link_offset" value="0.04"/>
+
+    <xacro:property name="str_angle" value="0.6"/>
+    <!-- steering -->
+    <xacro:property name="str_length" value="0.04"/>
+    <xacro:property name="str_radius" value="0.06"/>
+    <xacro:property name="str_mass" value="1"/>
+
+
+    <!--  color define  -->
+    <material name="black">
+        <color rgba="0 0 0 0.9"/>
+    </material>
+    <material name="white">
+        <color rgba="1 1 1 1"/>
+    </material>
+<!-- Macro for inertia matrix -->
+    <xacro:macro name="sphere_inertial_matrix" params="m r">
+        <inertial>
+            <mass value="${m}" />
+            <inertia ixx="${2*m*r*r/5}" ixy="0" ixz="0"
+                     iyy="${2*m*r*r/5}" iyz="0"
+                     izz="${2*m*r*r/5}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="cylinder_inertial_matrix" params="m r l">
+        <inertial>
+            <mass value="${m}" />
+            <inertia ixx="${m*(3*r*r+l*l)/12}" ixy = "0" ixz = "0"
+                     iyy="${m*(3*r*r+l*l)/12}" iyz = "0"
+                     izz="${m*r*r/2}" />
+        </inertial>
+    </xacro:macro>
+
+    <xacro:macro name="box_inertial_matrix" params="m l w h">
+        <inertial>
+            <mass value="${m}"/>
+            <inertia ixx="${m*(h*h+l*l)/12}" ixy="0" ixz="0"
+                     iyy="${m*(w*w+l*l)/12}" iyz="0"
+                     izz="${m*(h*h+w*w)/12}"/>
+        </inertial>
+    </xacro:macro>
+<!--  macro for robot support  -->
+    <xacro:macro name="support" params="prefix front left">
+        <link name="${prefix}_support_link">
+            <visual>
+                <origin xyz="0 0 0.15" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${support_length} ${support_width} ${support_height}"/>
+                </geometry>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0.15" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${support_length} ${support_width} ${support_height}"/>
+                </geometry>
+            </collision>
+            <box_inertial_matrix m="${support_mass}" l="${support_length}" w="${support_width}" h="${support_height}"/>
+        </link>
+
+        <joint name="${prefix}_support_joint" type="fixed">
+            <origin xyz="${support_offset*front} ${support_offset*left} 0" rpy="0 0 0"/>
+            <parent link="base_link"/>
+            <child link="${prefix}_support_link"/>
+        </joint>
+
+        <gazebo reference="${prefix}_support_link">
+            <material>Gazebo/Black</material>
+        </gazebo>
+
+    </xacro:macro>
+<!-- macro for robot rear wheel -->
+    <xacro:macro name="rear_wheel" params="prefix left">
+        <link name="${prefix}_rear_wheel_link">
+            <visual>
+                <origin xyz="0 ${left*rear_wheel_link_offset} 0" rpy="${M_PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+                </geometry>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <origin xyz="0 ${left*rear_wheel_link_offset} 0" rpy="${M_PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+                </geometry>
+            </collision>
+            <cylinder_inertial_matrix m="${wheel_mass}" r="${wheel_radius}" l="${wheel_length}"/>
+        </link>
+
+        <joint name="${prefix}_rear_wheel_joint" type="continuous">
+            <origin xyz="0 ${left*rear_wheel_offset} 0" rpy="0 0 0"/>
+            <parent link="rear_axle_link"/>
+            <child link="${prefix}_rear_wheel_link"/>
+            <axis xyz="0 1 0"/>
+            <dynamics damping="0.1"/>
+            <limit effort="1000000" velocity="10000" />
+            <joint_properties damping="0.0" friction="0.0" />
+        </joint>
+
+        <gazebo reference="${prefix}_rear_wheel_link">
+            <material>Gazebo/Blue</material>
+        </gazebo>
+        <!-- Transmission is important to link the joints and the controller -->
+        <transmission name="${prefix}_rear_wheel_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}_rear_wheel_joint" >
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="${prefix}_rear_wheel_joint_motor">
+                <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
+    </xacro:macro>
+<!--  macro for robot steer wheel  -->
+    <xacro:macro name="steer_wheel">
+        <link name="steer_wheel_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${str_radius}" length="${str_length}"/>
+                </geometry>
+                <material name="black"/>
+            </visual>
+            <cylinder_inertial_matrix m="${str_mass}" r="${str_radius}" l="${str_length}"/>
+        </link>
+        <link name="tyre_wheel_link">
+            <visual>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+                </geometry>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_length}"/>
+                </geometry>
+            </collision>
+            <cylinder_inertial_matrix m="${wheel_mass}" r="${wheel_radius}" l="${wheel_length}"/>
+        </link>
+        <joint name="steer_wheel_joint" type="revolute">
+            <origin xyz="0.40 0 0" rpy="0 0 0"/>
+            <parent link="base_link"/>
+            <child link="steer_wheel_link"/>
+            <axis xyz="0 0 1"/>
+            <limit lower="${-str_angle}" upper="${str_angle}" effort="1000000.0" velocity="10000.0"/>
+            <dynamics damping="10.0" friction="0.0"/>
+        </joint>
+        <joint name="tyre_wheel_joint" type="continuous">
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <parent link="steer_wheel_link"/>
+            <child link="tyre_wheel_link"/>
+            <axis xyz="0 1 0"/>
+            <dynamics damping="0.1"/>
+            <limit effort="1000000" velocity="10000" />
+            <joint_properties damping="0.0" friction="0.0" />
+        </joint>
+
+        <gazebo reference="steer_wheel_link">
+            <material>Gazebo/Black</material>
+        </gazebo>
+        <gazebo reference="tyre_wheel_link">
+            <material>Gazebo/Red</material>
+        </gazebo>
+        <!-- Transmission is important to link the joints and the controller -->
+        <transmission name="steer_wheel_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="steer_wheel_joint" >
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+            </joint>
+            <actuator name="steer_wheel_joint_motor">
+                <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+                <mechanicalReduction>1</mechanicalReduction>
+                <motorTorqueConstant>1000000</motorTorqueConstant>
+            </actuator>
+        </transmission>
+    </xacro:macro>
+<!--  main  -->
+    <xacro:macro name="kbot_base_gazebo">
+        <link name="base_footprint">
+            <visual>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="0.001 0.001 0.001" />
+                </geometry>
+            </visual>
+        </link>
+        <gazebo reference="base_footprint">
+            <turnGravityOff>false</turnGravityOff>
+        </gazebo>
+
+        <joint name="base_footprint_joint" type="fixed">
+            <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0" />
+            <parent link="base_footprint"/>
+            <child link="base_link" />
+        </joint>
+
+        <link name="base_link">
+            <visual>
+                <origin xyz=" 0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/>
+                </geometry>
+                <material name="white" />
+            </visual>
+            <collision>
+                <origin xyz=" 0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/>
+                </geometry>
+            </collision>
+            <box_inertial_matrix  m="${base_mass}" l="${base_length}" w="${base_width}" h="${base_height}" />
+        </link>
+        <gazebo reference="base_link">
+            <material>Gazebo/White</material>
+        </gazebo>
+        <!--  real axle  -->
+        <link name="rear_axle_link">
+            <visual>
+                <geometry>
+                    <cylinder length="0.54" radius="0.04"/>
+                </geometry>
+                <material name="white"/>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+            </visual>
+            <collision>
+                <geometry>
+                    <cylinder length="0.54" radius="0.04"/>
+                </geometry>
+                <origin xyz="0 0 0" rpy="${M_PI/2} 0 0"/>
+            </collision>
+            <cylinder_inertial_matrix  m="1" l="0.54" r="0.04"/>
+        </link>
+        <gazebo reference="rear_axle_link">
+            <material>Gazebo/White</material>
+        </gazebo>
+        <!--  base and rear axle joint;fixed  -->
+        <joint name="base_rear_axle_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="rear_axle_link"/>
+            <origin xyz="-0.2 0 0" rpy="0 0 0"/>
+        </joint>
+
+        <!--  upper_base_link  -->
+        <link name="upper_base_link">
+            <visual>
+                <origin xyz=" 0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/>
+                </geometry>
+                <material name="white" />
+            </visual>
+            <collision>
+                <origin xyz=" 0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <box size="${base_length} ${base_width} ${base_height}"/>
+                </geometry>
+            </collision>
+            <box_inertial_matrix  m="${base_mass}" l="${base_length}" w="${base_width}" h="${base_height}" />
+        </link>
+        <gazebo reference="upper_base_link">
+            <material>Gazebo/White</material>
+        </gazebo>
+
+        <!--  base and upper base joint;fixed  -->
+        <joint name="base_upper_base_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="upper_base_link"/>
+            <origin xyz="0 0 0.3" rpy="0 0 0"/>
+        </joint>
+        <support prefix="fl" front="1" left="1"/>
+        <support prefix="fr" front="1" left="-1"/>
+        <support prefix="rf" front="-1" left="1"/>
+        <support prefix="rr" front="-1" left="-1"/>
+        <rear_wheel prefix="left" left="1"/>
+        <rear_wheel prefix="right" left="-1"/>
+        <steer_wheel/>
+
+        <!-- Friction Parametres -->
+
+        <gazebo reference="right_rear_wheel_link">
+            <mu1>10000000</mu1>
+            <mu2>10000000</mu2>
+            <kp>10000000</kp>
+            <kd>1</kd>
+        </gazebo>
+
+        <gazebo reference="left_rear_wheel_link">
+            <mu1>10000000</mu1>
+            <mu2>10000000</mu2>
+            <kp>10000000</kp>
+            <kd>1</kd>
+        </gazebo>
+
+        <gazebo reference="tyre_wheel_link">
+            <mu1>10000000</mu1>
+            <mu2>10000000</mu2>
+            <kp>10000000</kp>
+            <kd>1</kd>
+        </gazebo>
+
+        <!-- Gazebo Plugins -->
+        <gazebo>
+            <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+                <robotNamespace>/kbot</robotNamespace>
+                <robotParam>robot_description</robotParam>
+                <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+            </plugin>
+        </gazebo>
+
+        <gazebo>
+            <plugin name="joint_state_publisher" filename="libgazebo_ros_joint_state_publisher.so">
+                <jointName>left_rear_wheel_joint, right_rear_wheel_joint, steer_wheel_joint</jointName>
+                <updateRate>50.0</updateRate>
+                <robotNamespace>/kbot</robotNamespace>
+                <alwaysOn>true</alwaysOn>
+            </plugin>
+        </gazebo>
+
+    </xacro:macro>
+
+</robot>
